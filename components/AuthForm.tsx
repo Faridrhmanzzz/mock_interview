@@ -18,14 +18,21 @@ import Image from "next/image"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { toast } from "sonner"
-// import { useRouter } from "next/router"
+// import FormField from "@/components/FormField"
 import { useRouter } from "next/navigation"
+
+// ✅ TAMBAHAN IMPORT FIREBASE
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
+import { auth } from "@/firebase/client" // pastikan path sesuai
+
+// ✅ IMPORT FUNCTION CUSTOM
+import { signIn, signUp } from "@/lib/actions/auth.action" // sesuaikan path
 
 const authFormSchema = (type: FormType) => {
     return z.object({
         name: type === "sign-up"
             ? z.string().min(3)
-            : z.string().optional(), //
+            : z.string().optional(),
         email: z.string().email(),
         password: z.string().min(3),
     })
@@ -44,18 +51,53 @@ const AuthForm = ({ type }: { type: FormType }) => {
         },
     })
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
             if (type === "sign-up") {
+                const { name, email, password } = values;
+
+                // ✅ FIX FUNCTION NAME
+                const userCredentials = await createUserWithEmailAndPassword(auth, email, password)
+
+                const result = await signUp({
+                    uid: userCredentials.user.uid, // ✅ FIX TYPO
+                    name: name!,
+                    email,
+                    password,
+                })
+
+                if (!result.success) {
+                    toast.error(result?.message);
+                    return;
+                }
+
                 toast.success('Account created successfully. Please sign in');
                 router.push('/sign-in')
+
             } else {
+                // ✅ TAMBAHAN SIGN IN
+                const { email, password } = values;
+
+                // FIX: Menambahkan nama variabel userCredential dan menghapus 'await' yang salah posisi
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+                const idToken = await userCredential.user.getIdToken();
+
+                if(!idToken) {
+                    toast.error("Sign in failed")
+                    return;
+                }
+
+                await signIn({
+                    email, idToken
+                })
+
                 toast.success('Sign in successfully.');
                 router.push('/')
             }
-        } catch (error) {
+        } catch (error: any) {
             console.log(error)
-            toast.error(`There was an error: ${error}`)
+            toast.error(`There was an error: ${error.message}`)
         }
     }
 
@@ -75,7 +117,6 @@ const AuthForm = ({ type }: { type: FormType }) => {
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-6 mt-4 form">
 
-                        {/* NAME (SIGN UP ONLY) */}
                         {!isSignIn && (
                             <FormField
                                 control={form.control}
@@ -92,7 +133,6 @@ const AuthForm = ({ type }: { type: FormType }) => {
                             />
                         )}
 
-                        {/* EMAIL */}
                         <FormField
                             control={form.control}
                             name="email"
@@ -107,7 +147,6 @@ const AuthForm = ({ type }: { type: FormType }) => {
                             )}
                         />
 
-                        {/* PASSWORD */}
                         <FormField
                             control={form.control}
                             name="password"
