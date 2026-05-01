@@ -6,14 +6,18 @@ import { getCurrentUser } from "@/lib/actions/auth.action";
 const Page = async () => {
     const user = await getCurrentUser();
 
+    // 🔥 TAMBAHKAN INI
+    if (!user) {
+        return <div>Please login first</div>;
+    }
+
     return (
         <>
             <h3>Interview Generation</h3>
 
-            {/* Pastikan prop name dan id sesuai dengan struktur objek user Anda */}
             <Agent
-                userName={user?.firstName || user?.name}
-                userId={user?.$id || user?.id}
+                userName={user.firstName || user.name || "User"}
+                userId={user.$id || user.id}
                 type="generate"
             />
         </>
