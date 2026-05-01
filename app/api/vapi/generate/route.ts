@@ -43,7 +43,7 @@ export async function POST(request: Request) {
                 },
                 {
                     role: "user",
-                    content: `Generate ${amount || 5} interview questions for ${role} position. Tech: ${techstack}. Level: ${level}. Focus: ${type}.`
+                    content: `Generate ${amount} interview questions for ${role} position. Tech: ${techstack}. Level: ${level}. Focus: ${type}.`
                 }
             ],
             response_format: { type: "json_object" }
