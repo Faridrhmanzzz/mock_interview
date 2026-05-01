@@ -21,15 +21,32 @@ export async function POST(request: Request) {
             console.error("❌ TOOL TIDAK TERPANGGIL");
             return Response.json({ error: "No tool call" }, { status: 400 });
         }
-        console.log("📦 RAW ARGUMENTS:", toolCall.function?.arguments);
 
+        // 🔥 Ambil arguments dari berbagai kemungkinan struktur Vapi
+        const rawArgs =
+            toolCall.function?.arguments ||
+            toolCall.arguments;
+
+        console.log("📦 RAW ARGUMENTS:", rawArgs);
+
+        if (!rawArgs) {
+            console.error("❌ ARGUMENTS TIDAK ADA");
+            return Response.json({ error: "No arguments" }, { status: 400 });
+        }
+
+        // 🔥 Parsing fleksibel (JSON atau object-like)
         let args;
+
         try {
-            args = JSON.parse(toolCall.function.arguments);
-            console.log("✅ PARSED ARGS:", args);
+            args = JSON.parse(rawArgs);
         } catch (err) {
-            console.error("❌ PARSE ERROR:", toolCall.function.arguments);
-            return Response.json({ error: "Parse error" }, { status: 400 });
+            console.warn("⚠️ JSON.parse gagal, coba eval fallback");
+            try {
+                args = eval(`(${rawArgs})`);
+            } catch (e) {
+                console.error("❌ TOTAL PARSE GAGAL:", rawArgs);
+                return Response.json({ error: "Invalid arguments format" }, { status: 400 });
+            }
         }
 
         console.log("✅ PARSED ARGS:", args);
