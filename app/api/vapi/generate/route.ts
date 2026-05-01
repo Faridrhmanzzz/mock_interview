@@ -22,48 +22,51 @@ export async function POST(request: Request) {
             return Response.json({ error: "No tool call" }, { status: 400 });
         }
 
-        // 🔥 Ambil arguments dari berbagai kemungkinan struktur Vapi
+        //
         const rawArgs =
-            toolCall.function?.arguments ||
+            toolCall.function?.arguments ??
             toolCall.arguments;
 
-        console.log("📦 RAW ARGUMENTS:", rawArgs);
-
         if (!rawArgs) {
-            console.error("❌ ARGUMENTS TIDAK ADA");
             return Response.json({ error: "No arguments" }, { status: 400 });
         }
 
-        // 🔥 Parsing fleksibel (JSON atau object-like)
-        let args;
+        let args: any;
 
-        try {
-            args = JSON.parse(rawArgs);
-        } catch (err) {
-            console.warn("⚠️ JSON.parse gagal, coba eval fallback");
+        if (typeof rawArgs === "string") {
             try {
-                args = eval(`(${rawArgs})`);
-            } catch (e) {
-                console.error("❌ TOTAL PARSE GAGAL:", rawArgs);
-                return Response.json({ error: "Invalid arguments format" }, { status: 400 });
+                args = JSON.parse(rawArgs);
+            } catch {
+                return Response.json(
+                    { error: "Invalid arguments JSON" },
+                    { status: 400 }
+                );
             }
+        } else if (typeof rawArgs === "object") {
+            args = rawArgs;
+        } else {
+            return Response.json(
+                { error: "Invalid arguments type" },
+                { status: 400 }
+            );
         }
+        //
 
-        console.log("✅ PARSED ARGS:", args);
+        let { type, role, level, techstack, amount } = args;
 
-        let { type, role, level, techstack, amount, userid } = args;
-
-        // ✅ fallback biar tidak gagal
-        role = role || "Software Engineer";
-        type = type || "Technical";
-        level = level || "Junior";
-        techstack = techstack || "General";
-        amount = Number(amount) || 5;
+        const userid =
+            body.message?.artifact?.variableValues?.userid ||
+            body.message?.variableValues?.userid ||
+            body.message?.call?.assistantOverrides?.variableValues?.userid ||
+            body.message?.assistant?.variableValues?.userid ||
+            body.call?.assistantOverrides?.variableValues?.userid ||
+            body.assistant?.variableValues?.userid;
 
         if (!userid) {
-            return Response.json({
-                error: "Missing userid"
-            }, { status: 400 });
+            return Response.json(
+                { error: "Missing Firebase login user id" },
+                { status: 400 }
+            );
         }
 
         // ✅ Generate pertanyaan
