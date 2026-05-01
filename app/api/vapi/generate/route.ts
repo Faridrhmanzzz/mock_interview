@@ -11,15 +11,21 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        // MENGAMBIL DATA DARI STRUKTUR VAPI
-        const args = body.message.toolCalls[0].function.arguments;
-        const { type, role, level, techstack, amount, userid } = args;
-
-        // Validasi minimal agar tidak undefined di Firestore
-        if (!role || !userid) {
-            throw new Error("Missing required fields: role or userid");
+        // 1. EKSTRAKSI ARGUMEN DARI STRUKTUR WEBHOOK VAPI
+        const toolCall = body.message.toolCalls?.[0];
+        if (!toolCall) {
+            throw new Error("No tool call found in the request");
         }
 
+        const { type, role, level, techstack, amount, userid } = toolCall.function.arguments;
+
+        // 2. VALIDASI DATA MINIMAL
+        if (!role || !userid) {
+            console.error("Missing Data:", { role, userid });
+            return Response.json({ error: "Role and UserID are required" }, { status: 400 });
+        }
+
+        // 3. GENERATE PERTANYAAN VIA GROQ (LLAMA 3.1)
         const completion = await client.chat.completions.create({
             model: "llama-3.1-8b-instant",
             messages: [
@@ -39,8 +45,9 @@ export async function POST(request: Request) {
         const parsedData = JSON.parse(content);
         const parsedQuestions = Array.isArray(parsedData.questions) ? parsedData.questions : [];
 
+        // 4. STRUKTUR DATA UNTUK FIRESTORE
         const interview = {
-            role: role || "Unknown Role",
+            role: role || "Software Engineer",
             type: type || "Mixed",
             level: level || "Junior",
             techstack: typeof techstack === 'string' ? techstack.split(',').map((s: string) => s.trim()) : techstack,
@@ -51,9 +58,14 @@ export async function POST(request: Request) {
             createdAt: new Date().toISOString()
         };
 
+        // 5. SIMPAN KE FIRESTORE
         const docRef = await db.collection("interviews").add(interview);
 
-        return Response.json({ success: true, id: docRef.id }, { status: 200 });
+        // 6. RESPON UNTUK VAPI (PENTING AGAR TIDAK ERROR "NO RESULT RETURNED")
+        return Response.json({
+            result: "success",
+            message: `Interview template created with ID: ${docRef.id}`
+        }, { status: 200 });
 
     } catch (error: any) {
         console.error("Vapi/Groq/Firebase Error:", error);
