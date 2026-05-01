@@ -11,77 +11,96 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        // 1. Ekstraksi Tool Call dari Vapi
-        const toolCall = body.message.toolCalls?.[0];
+        console.log("RAW BODY:", JSON.stringify(body, null, 2));
+
+        const toolCall = body.message?.toolCalls?.[0];
 
         if (!toolCall) {
-            console.error("No tool call detected in request body");
+            console.error("❌ No tool call detected");
             return Response.json({ error: "No tool call found" }, { status: 400 });
         }
 
-        // 2. Ambil argumen yang dikirim AI
-        const { type, role, level, techstack, amount, userid } = toolCall.function.arguments;
+        // ✅ WAJIB: parse arguments
+        let args;
+        try {
+            args = JSON.parse(toolCall.function.arguments);
+        } catch (err) {
+            console.error("❌ Failed to parse arguments:", toolCall.function.arguments);
+            return Response.json({ error: "Invalid arguments format" }, { status: 400 });
+        }
 
-        // Debugging: Cek data di log Vercel
-        console.log("Payload diterima:", { role, techstack, userid });
+        console.log("✅ PARSED ARGS:", args);
 
-        // 3. Validasi ketat agar Firestore tidak crash
-        if (!role || !userid) {
+        let { type, role, level, techstack, amount, userid } = args;
+
+        // ✅ fallback biar tidak gagal
+        role = role || "Software Engineer";
+        type = type || "Technical";
+        level = level || "Junior";
+        techstack = techstack || "General";
+        amount = Number(amount) || 5;
+
+        if (!userid) {
             return Response.json({
-                error: "Missing required fields",
-                details: `Role: ${role}, UserID: ${userid}`
+                error: "Missing userid"
             }, { status: 400 });
         }
 
-        // 4. Generate Pertanyaan via Groq
+        // ✅ Generate pertanyaan
         const completion = await client.chat.completions.create({
             model: "llama-3.1-8b-instant",
             messages: [
                 {
                     role: "system",
-                    content: "Return a JSON object with a key 'questions' containing an array of strings."
+                    content: "Return a JSON object with key 'questions' (array of strings)."
                 },
                 {
                     role: "user",
-                    content: `Generate ${amount} interview questions for ${role} position. Tech: ${techstack}. Level: ${level}. Focus: ${type}.`
+                    content: `Generate ${amount} interview questions for ${role}. Tech: ${techstack}. Level: ${level}. Type: ${type}`
                 }
             ],
             response_format: { type: "json_object" }
         });
 
-        const content = completion.choices[0].message.content || '{"questions": []}';
-        const parsedData = JSON.parse(content);
-        const parsedQuestions = Array.isArray(parsedData.questions) ? parsedData.questions : [];
+        const content = completion.choices[0].message.content || "{}";
 
-        // 5. Susun objek untuk Firestore
+        let questions: string[] = [];
+
+        try {
+            const parsed = JSON.parse(content);
+            questions = Array.isArray(parsed.questions) ? parsed.questions : [];
+        } catch (err) {
+            console.error("❌ AI JSON parse error:", content);
+        }
+
         const interviewData = {
-            role: role,
-            type: type || "Mixed",
-            level: level || "Junior",
-            // Pastikan techstack jadi array
-            techstack: typeof techstack === 'string' ? techstack.split(',').map((s: string) => s.trim()) : techstack,
-            questions: parsedQuestions,
+            role,
+            type,
+            level,
+            techstack: typeof techstack === "string"
+                ? techstack.split(",").map((s: string) => s.trim())
+                : [],
+            questions,
             userId: userid,
             finalized: true,
             coverImage: getRandomInterviewCover(),
             createdAt: new Date().toISOString()
         };
 
-        // 6. Simpan ke Firebase Admin
         const docRef = await db.collection("interviews").add(interviewData);
 
-        // 7. Berikan respon sukses ke Vapi
+        console.log("✅ FIREBASE SUCCESS:", docRef.id);
+
         return Response.json({
-            result: "success",
-            message: "Interview created successfully",
+            success: true,
             id: docRef.id
-        }, { status: 200 });
+        });
 
     } catch (error: any) {
-        console.error("Critical Error in route.ts:", error);
+        console.error("🔥 CRITICAL ERROR:", error);
         return Response.json({
             success: false,
-            error: error?.message || "Internal Server Error"
+            error: error?.message
         }, { status: 500 });
     }
 }

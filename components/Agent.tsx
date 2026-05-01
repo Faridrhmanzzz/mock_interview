@@ -1,8 +1,9 @@
 'use client';
-import React, {useEffect, useState} from 'react'
+
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
-import {useRouter} from "next/navigation";
+import { useRouter } from "next/navigation";
 import { vapi } from '@/lib/vapi.sdk';
 
 enum CallStatus {
@@ -12,33 +13,70 @@ enum CallStatus {
     FINISHED = 'FINISHED',
 }
 
-interface SavedMessage{
+interface SavedMessage {
     role: 'user' | 'system' | 'assistant';
     content: string;
 }
 
-const Agent = ({ userName, userId, type } : any) => {
+interface AgentProps {
+    userName: string;
+    userId: string;
+    type?: string;
+    role?: string;
+    level?: string;
+    techstack?: string;
+}
+
+const Agent = ({
+                   userName,
+                   userId,
+                   type,
+                   role,
+                   level,
+                   techstack
+               }: AgentProps) => {
+
     const router = useRouter();
+
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
-    const [messages, setMessages] = useState<SavedMessage[]>([]); // Perbaikan: samakan nama dengan render di bawah
+    const [messages, setMessages] = useState<SavedMessage[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
+    // 🔥 HANDLE EVENTS VAPI
     useEffect(() => {
-        const onCallStart = () => setCallStatus(CallStatus.ACTIVE);
-        const onCallEnd = () => setCallStatus(CallStatus.FINISHED);
+
+        const onCallStart = () => {
+            console.log("✅ Call started");
+            setCallStatus(CallStatus.ACTIVE);
+        };
+
+        const onCallEnd = () => {
+            console.log("📴 Call ended");
+            setCallStatus(CallStatus.FINISHED);
+        };
 
         const onMessage = (message: any) => {
-            if(message.type === 'transcript' && message.transcriptType === 'final'){
-                const newMessage: SavedMessage = { role: message.role, content: message.transcript }
+            console.log("📩 MESSAGE:", message);
 
-                setMessages((prev) => [ ... prev, newMessage]);
+            if (message.type === 'transcript' && message.transcriptType === 'final') {
+                const newMessage: SavedMessage = {
+                    role: message.role,
+                    content: message.transcript
+                };
+
+                setMessages((prev) => [...prev, newMessage]);
             }
-        }
+        };
 
         const onSpeechStart = () => setIsSpeaking(true);
         const onSpeechEnd = () => setIsSpeaking(false);
 
-        const onError = (error: Error) => console.log('Error', error); // Perbaikan: perbaiki syntax arrow function
+        const onError = (err: any) => {
+            console.error("🔥 VAPI ERROR:", err);
+            setError("Terjadi kesalahan saat call.");
+            setCallStatus(CallStatus.FINISHED);
+        };
 
         vapi.on('call-start', onCallStart);
         vapi.on('call-end', onCallEnd);
@@ -47,47 +85,78 @@ const Agent = ({ userName, userId, type } : any) => {
         vapi.on('speech-end', onSpeechEnd);
         vapi.on('error', onError);
 
-        return () => { // Perbaikan: perbaiki syntax arrow function
+        return () => {
             vapi.off('call-start', onCallStart);
             vapi.off('call-end', onCallEnd);
             vapi.off('message', onMessage);
             vapi.off('speech-start', onSpeechStart);
             vapi.off('speech-end', onSpeechEnd);
             vapi.off('error', onError);
-        }
-    }, [])
+        };
 
+    }, []);
+
+    // 🔁 REDIRECT SETELAH CALL SELESAI
     useEffect(() => {
-        if(callStatus === CallStatus.FINISHED) router.push('/');
-    }, [messages, callStatus, type, userId, router]); // Perbaikan: tambahkan router ke dependency
+        if (callStatus === CallStatus.FINISHED) {
+            setTimeout(() => {
+                router.push('/');
+            }, 1500);
+        }
+    }, [callStatus, router]);
 
+    // 🚀 START CALL
     const handleCall = async () => {
-        setCallStatus(CallStatus.CONNECTING);
+        try {
+            setError(null);
+            setCallStatus(CallStatus.CONNECTING);
 
-        await vapi.start(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID!, {
-            variableValues:{
-                username: userName,
-                userid: userId,
-            }
-        })
-    }
+            await vapi.start(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID!, {
+                variableValues: {
+                    username: userName,
+                    userid: userId,
 
-    const handleDisconnect = async () => {
-        setCallStatus(CallStatus.FINISHED);
-        vapi.stop();
-    }
+                    // 🔥 Optional tapi bantu AI
+                    role: role || "",
+                    type: type || "",
+                    level: level || "",
+                    techstack: techstack || "",
+                    amount: 5
+                }
+            });
 
-    const latestMessage = messages[messages.length - 1]?.content; // Perbaikan: gunakan 'messages' bukan 'message'
-    const isCallIncativeOrFinished = callStatus === CallStatus.INACTIVE || callStatus === CallStatus.FINISHED;
+        } catch (err) {
+            console.error("❌ Failed to start call:", err);
+            setError("Gagal memulai panggilan.");
+            setCallStatus(CallStatus.INACTIVE);
+        }
+    };
+
+    // 🛑 STOP CALL
+    const handleDisconnect = () => {
+        try {
+            vapi.stop();
+            setCallStatus(CallStatus.FINISHED);
+        } catch (err) {
+            console.error("❌ Failed to stop call:", err);
+        }
+    };
+
+    const latestMessage = messages[messages.length - 1]?.content;
+
+    const isInactiveOrFinished =
+        callStatus === CallStatus.INACTIVE ||
+        callStatus === CallStatus.FINISHED;
 
     return (
         <>
+            {/* 🔊 CALL VIEW */}
             <div className="call-view">
                 <div className="card-interviewer">
                     <div className="avatar">
                         <Image
                             src="/ai-avatar.png"
-                            alt="vapi"
+                            alt="AI"
                             width={65}
                             height={54}
                             className="object-cover"
@@ -101,7 +170,7 @@ const Agent = ({ userName, userId, type } : any) => {
                     <div className="card-content">
                         <Image
                             src="/user-avatar.png"
-                            alt="user avatar"
+                            alt="User"
                             width={540}
                             height={540}
                             className="rounded-full object-cover size-[120px]"
@@ -110,20 +179,39 @@ const Agent = ({ userName, userId, type } : any) => {
                     </div>
                 </div>
             </div>
-            {messages.length > 0 && ( // Perbaikan: gunakan 'messages'
+
+            {/* 💬 TRANSCRIPT */}
+            {messages.length > 0 && (
                 <div className="transcript-border">
                     <div className="transcript">
-                        <p key={latestMessage} className={cn('transition-opacity duration-500 opacity-0', 'animate-fadeIn opacity-100')}>
+                        <p
+                            key={latestMessage}
+                            className={cn(
+                                'transition-opacity duration-500 opacity-0',
+                                'animate-fadeIn opacity-100'
+                            )}
+                        >
                             {latestMessage}
                         </p>
                     </div>
                 </div>
             )}
 
+            {/* ❌ ERROR */}
+            {error && (
+                <p className="text-red-500 text-center mt-4">
+                    {error}
+                </p>
+            )}
+
+            {/* 🎮 BUTTON */}
             <div className="w-full flex justify-center items-center mt-6">
                 {callStatus !== CallStatus.ACTIVE ? (
-                    <button className="relative btn-call" onClick={handleCall}>
-
+                    <button
+                        className="relative btn-call"
+                        onClick={handleCall}
+                        disabled={callStatus === CallStatus.CONNECTING}
+                    >
                         <span
                             className={cn(
                                 'absolute animate-ping rounded-full opacity-75',
@@ -132,20 +220,22 @@ const Agent = ({ userName, userId, type } : any) => {
                         ></span>
 
                         <span>
-                            {isCallIncativeOrFinished
-                                ? 'Call'
-                                : '...'}
+                            {isInactiveOrFinished
+                                ? 'Start Interview'
+                                : 'Connecting...'}
                         </span>
-
                     </button>
                 ) : (
-                    <button className="btn-disconnect" onClick={handleDisconnect}>
-                        END
+                    <button
+                        className="btn-disconnect"
+                        onClick={handleDisconnect}
+                    >
+                        End Call
                     </button>
                 )}
             </div>
         </>
-    )
-}
+    );
+};
 
 export default Agent;
