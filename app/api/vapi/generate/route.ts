@@ -11,21 +11,29 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        // 1. EKSTRAKSI ARGUMEN DARI STRUKTUR WEBHOOK VAPI
+        // 1. Ekstraksi Tool Call dari Vapi
         const toolCall = body.message.toolCalls?.[0];
+
         if (!toolCall) {
-            throw new Error("No tool call found in the request");
+            console.error("No tool call detected in request body");
+            return Response.json({ error: "No tool call found" }, { status: 400 });
         }
 
+        // 2. Ambil argumen yang dikirim AI
         const { type, role, level, techstack, amount, userid } = toolCall.function.arguments;
 
-        // 2. VALIDASI DATA MINIMAL
+        // Debugging: Cek data di log Vercel
+        console.log("Payload diterima:", { role, techstack, userid });
+
+        // 3. Validasi ketat agar Firestore tidak crash
         if (!role || !userid) {
-            console.error("Missing Data:", { role, userid });
-            return Response.json({ error: "Role and UserID are required" }, { status: 400 });
+            return Response.json({
+                error: "Missing required fields",
+                details: `Role: ${role}, UserID: ${userid}`
+            }, { status: 400 });
         }
 
-        // 3. GENERATE PERTANYAAN VIA GROQ (LLAMA 3.1)
+        // 4. Generate Pertanyaan via Groq
         const completion = await client.chat.completions.create({
             model: "llama-3.1-8b-instant",
             messages: [
@@ -35,7 +43,7 @@ export async function POST(request: Request) {
                 },
                 {
                     role: "user",
-                    content: `Prepare ${amount} questions for a ${role} position. Level: ${level}. Tech: ${techstack}. Focus: ${type}.`
+                    content: `Generate ${amount || 5} interview questions for ${role} position. Tech: ${techstack}. Level: ${level}. Focus: ${type}.`
                 }
             ],
             response_format: { type: "json_object" }
@@ -45,11 +53,12 @@ export async function POST(request: Request) {
         const parsedData = JSON.parse(content);
         const parsedQuestions = Array.isArray(parsedData.questions) ? parsedData.questions : [];
 
-        // 4. STRUKTUR DATA UNTUK FIRESTORE
-        const interview = {
-            role: role || "Software Engineer",
+        // 5. Susun objek untuk Firestore
+        const interviewData = {
+            role: role,
             type: type || "Mixed",
             level: level || "Junior",
+            // Pastikan techstack jadi array
             techstack: typeof techstack === 'string' ? techstack.split(',').map((s: string) => s.trim()) : techstack,
             questions: parsedQuestions,
             userId: userid,
@@ -58,17 +67,18 @@ export async function POST(request: Request) {
             createdAt: new Date().toISOString()
         };
 
-        // 5. SIMPAN KE FIRESTORE
-        const docRef = await db.collection("interviews").add(interview);
+        // 6. Simpan ke Firebase Admin
+        const docRef = await db.collection("interviews").add(interviewData);
 
-        // 6. RESPON UNTUK VAPI (PENTING AGAR TIDAK ERROR "NO RESULT RETURNED")
+        // 7. Berikan respon sukses ke Vapi
         return Response.json({
             result: "success",
-            message: `Interview template created with ID: ${docRef.id}`
+            message: "Interview created successfully",
+            id: docRef.id
         }, { status: 200 });
 
     } catch (error: any) {
-        console.error("Vapi/Groq/Firebase Error:", error);
+        console.error("Critical Error in route.ts:", error);
         return Response.json({
             success: false,
             error: error?.message || "Internal Server Error"
