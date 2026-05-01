@@ -10,23 +10,26 @@ const client = new OpenAI({
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-
-        console.log("RAW BODY:", JSON.stringify(body, null, 2));
-
-        const toolCall = body.message?.toolCalls?.[0];
+        console.log("🔥 FULL BODY:", JSON.stringify(body, null, 2));
+        const toolCall =
+            body.message?.toolCalls?.[0] ||
+            body.toolCall ||
+            body.toolCalls?.[0];
+        console.log("🧩 TOOL CALL:", JSON.stringify(toolCall, null, 2));
 
         if (!toolCall) {
-            console.error("❌ No tool call detected");
-            return Response.json({ error: "No tool call found" }, { status: 400 });
+            console.error("❌ TOOL TIDAK TERPANGGIL");
+            return Response.json({ error: "No tool call" }, { status: 400 });
         }
+        console.log("📦 RAW ARGUMENTS:", toolCall.function?.arguments);
 
-        // ✅ WAJIB: parse arguments
         let args;
         try {
             args = JSON.parse(toolCall.function.arguments);
+            console.log("✅ PARSED ARGS:", args);
         } catch (err) {
-            console.error("❌ Failed to parse arguments:", toolCall.function.arguments);
-            return Response.json({ error: "Invalid arguments format" }, { status: 400 });
+            console.error("❌ PARSE ERROR:", toolCall.function.arguments);
+            return Response.json({ error: "Parse error" }, { status: 400 });
         }
 
         console.log("✅ PARSED ARGS:", args);
