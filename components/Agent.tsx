@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { vapi } from '@/lib/vapi.sdk';
+import {interviewer} from "@/constants"
+import {createFeedback} from "@/lib/actions/general.action";
 
 enum CallStatus {
     INACTIVE = 'INACTIVE',
@@ -31,6 +33,8 @@ const Agent = ({
                    userName,
                    userId,
                    type,
+                   interviewId,
+                   questions,
                    role,
                    level,
                    techstack
@@ -73,7 +77,10 @@ const Agent = ({
         const onSpeechEnd = () => setIsSpeaking(false);
 
         const onError = (err: any) => {
-            console.error("🔥 VAPI ERROR:", err);
+            console.error("🔥 VAPI ERROR:", JSON.stringify(err, null, 2));
+            console.error("Error keys:", Object.keys(err));
+            console.error("Error message:", err?.message);
+            console.error("Error code:", err?.code || err?.statusCode);
             setError("Terjadi kesalahan saat call.");
             setCallStatus(CallStatus.FINISHED);
         };
@@ -96,12 +103,31 @@ const Agent = ({
 
     }, []);
 
+    const handleGenerateFeedback = async (messages: SavedMessage) => {
+        console.log('Generate feedback here.');
+
+        // TODO : Create a server action that generates feedback
+        const {success, feedbackId: id} = await createFeedback({
+            interviewId: interviewId!,
+            userId: userId!,
+            transcript: messages
+        })
+
+        if (success && id){
+            router.push(`/interview/${interviewId}/feedback`);
+        } else {
+            console.log('Error saving feedback');
+            router.push('/');
+        }
+    }
     // 🔁 REDIRECT SETELAH CALL SELESAI
     useEffect(() => {
-        if (callStatus === CallStatus.FINISHED) {
-            setTimeout(() => {
-                router.push('/');
-            }, 1500);
+        if (callStatus === CallStatus.FINISHED){
+            if (type === 'generate'){
+                router.push('/')
+            } else {
+                handleGenerateFeedback(messages);
+            }
         }
     }, [callStatus, router]);
 
@@ -111,19 +137,38 @@ const Agent = ({
             setError(null);
             setCallStatus(CallStatus.CONNECTING);
 
-            await vapi.start(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID!, {
-                variableValues: {
-                    username: userName,
-                    userid: userId,
+            if (type === 'generate'){
+                // Tambahkan ini sementara di handleCall sebelum vapi.start
+                console.log("Assistant ID:", process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID);
+                await vapi.start(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID!, {
+                    variableValues: {
+                        username: userName,
+                        userid: userId,
 
-                    // 🔥 Optional tapi bantu AI
-                    role: role || "",
-                    type: type || "",
-                    level: level || "",
-                    techstack: techstack || "",
-                    amount: 5
+                        // 🔥 Optional tapi bantu AI
+                        role: role || "",
+                        type: type || "",
+                        level: level || "",
+                        techstack: techstack || "",
+                        amount: 5
+                    }
+                })
+            } else {
+                let formattedQuestions = '';
+
+                if (questions) {
+                    formattedQuestions = questions
+                        .map((question) => `- ${question}`)
+                        .join('\n');
                 }
-            });
+
+                await vapi.start(interviewer, {
+                    variableValues: {
+                        questions: formattedQuestions
+                    }
+                })
+            }
+
 
         } catch (err) {
             console.error("❌ Failed to start call:", err);
@@ -204,7 +249,7 @@ const Agent = ({
                 </p>
             )}
 
-            {/* 🎮 BUTTON */}
+            {/*  BUTTON */}
             <div className="w-full flex justify-center items-center mt-6">
                 {callStatus !== CallStatus.ACTIVE ? (
                     <button

@@ -3,19 +3,26 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import InterviewCard from "@/components/InterviewCard";
-import { getCurrentUser, getInterviewsByUserId, getLatestInterviews } from "@/lib/actions/auth.action";
+import { getCurrentUser } from "@/lib/actions/auth.action";
+import { getInterviewsByUserId, getFeedbackByInterviewId } from "@/lib/actions/general.action";
 
 const Page = async () => {
     const user = await getCurrentUser();
 
-    // Perbaikan: Jangan gunakan 'await' di dalam array Promise.all
-    const [userInterviews, latestInterviews] = await Promise.all([
-        getInterviewsByUserId(user?.id!),
-        getLatestInterviews({ userId: user?.id! })
-    ]);
+    const userInterviews = await getInterviewsByUserId(user?.id!);
 
-    const hasPastInterviews = (userInterviews?.length ?? 0) > 0;
-    const hasUpcomingInterviews = (latestInterviews?.length ?? 0) > 0;
+    const interviewsWithFeedback = await Promise.all(
+        (userInterviews || []).map(async (interview) => {
+            const feedback = await getFeedbackByInterviewId({
+                interviewId: interview.id,
+                userId: user?.id!
+            });
+            return { ...interview, hasFeedback: !!feedback };
+        })
+    );
+
+    const completedInterviews = interviewsWithFeedback.filter((i) => i.hasFeedback);
+    const pendingInterviews = interviewsWithFeedback.filter((i) => !i.hasFeedback);
 
     return (
         <div>
@@ -42,12 +49,18 @@ const Page = async () => {
             <section className="flex flex-col gap-6 mt-8">
                 <h2>Your Interviews</h2>
                 <div className="interviews-section">
-                    {hasPastInterviews ? (
-                        userInterviews?.map((interview) => (
-                            <InterviewCard {...interview} key={interview.id} />
+                    {completedInterviews.length > 0 ? (
+                        completedInterviews.map((interview) => (
+                            <InterviewCard
+                                {...interview}
+                                userId={user?.id}
+                                key={interview.id}
+                            />
                         ))
                     ) : (
-                        <p className="text-muted-foreground">You haven&apos;t taken any interviews yet</p>
+                        <p className="text-muted-foreground">
+                            You haven&apos;t taken any interviews yet
+                        </p>
                     )}
                 </div>
             </section>
@@ -55,12 +68,18 @@ const Page = async () => {
             <section className="flex flex-col gap-6 mt-8">
                 <h2>Take an Interview</h2>
                 <div className="interviews-section">
-                    {hasUpcomingInterviews ? (
-                        latestInterviews?.map((interview) => (
-                            <InterviewCard {...interview} key={interview.id} />
+                    {pendingInterviews.length > 0 ? (
+                        pendingInterviews.map((interview) => (
+                            <InterviewCard
+                                {...interview}
+                                userId={user?.id}
+                                key={interview.id}
+                            />
                         ))
                     ) : (
-                        <p className="text-muted-foreground">There are no new interviews available</p>
+                        <p className="text-muted-foreground">
+                            There are no new interviews available
+                        </p>
                     )}
                 </div>
             </section>
