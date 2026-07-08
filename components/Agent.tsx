@@ -24,6 +24,8 @@ interface AgentProps {
     userName: string;
     userId: string;
     type?: string;
+    interviewId?: string;
+    questions?: string[];
     role?: string;
     level?: string;
     techstack?: string;
@@ -103,7 +105,7 @@ const Agent = ({
 
     }, []);
 
-    const handleGenerateFeedback = async (messages: SavedMessage) => {
+    const handleGenerateFeedback = async (messages: SavedMessage[]) => {
         console.log('Generate feedback here.');
 
         // TODO : Create a server action that generates feedback
@@ -158,7 +160,7 @@ const Agent = ({
 
                 if (questions) {
                     formattedQuestions = questions
-                        .map((question) => `- ${question}`)
+                        .map((question: string) => `- ${question}`)
                         .join('\n');
                 }
 
