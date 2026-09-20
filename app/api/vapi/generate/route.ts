@@ -114,9 +114,15 @@ export async function POST(request: Request) {
 
         console.log("✅ FIREBASE SUCCESS:", docRef.id);
 
+        const toolCallId = toolCall.id || toolCall.toolCallId || "unknown";
+
         return Response.json({
-            success: true,
-            interviewId: docRef.id
+            results: [
+                {
+                    toolCallId: toolCallId,
+                    result: `Interview successfully saved with ID: ${docRef.id}`
+                }
+            ]
         });
 
     } catch (error: any) {
