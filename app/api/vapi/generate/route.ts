@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
         // ✅ Generate pertanyaan
         const completion = await client.chat.completions.create({
-            model: "llama3-8b-8192",
+            model: "openai/gpt-oss-20b",
             messages: [
                 {
                     role: "system",
