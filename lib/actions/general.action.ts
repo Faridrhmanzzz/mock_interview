@@ -1,18 +1,18 @@
 'use server'
-import {db} from "@/firebase/admin";
-import {generateObject} from "ai";
-import {feedbackSchema} from "@/constants";
+import { db } from "@/firebase/admin";
+import { generateObject } from "ai";
+import { feedbackSchema } from "@/constants";
 import { groq } from "@ai-sdk/groq";
 
 export async function getInterviewsByUserId(userId: string): Promise<Interview[] | null> {
     const interviews = await db
         .collection('interviews')
-        .where('userId', '==', userId)
+        .where('interviewUserId', '==', userId)
         .orderBy('createdAt', 'desc')
         .get();
 
     return interviews.docs.map((doc) => ({
-        id: doc.id,
+        interviewId: doc.id,
         ...doc.data()
     })) as Interview[];
 }
@@ -24,12 +24,12 @@ export async function getLatestInterviews(params: GetLatestInterviewsParams): Pr
         .collection('interviews')
         .orderBy('createdAt', 'desc')
         .where('finalized', '==', true)
-        .where('userId', '==', userId)
+        .where('interviewUserId', '==', userId)
         .limit(limit)
         .get();
 
     return interviews.docs.map((doc) => ({
-        id: doc.id,
+        interviewId: doc.id,
         ...doc.data()
     })) as Interview[];
 }
@@ -40,11 +40,13 @@ export async function getInterviewsById(id: string): Promise<Interview | null> {
         .doc(id)
         .get();
 
-    return interview.data() as Interview | null;
+    const data = interview.data();
+    if (!data) return null;
+    return { interviewId: id, ...data } as Interview;
 }
 
-export async function createFeedback(params: CreateFeedbackParams){
-    const {interviewId, userId, transcript} = params;
+export async function createFeedback(params: CreateFeedbackParams) {
+    const { interviewId, userId, transcript } = params;
 
     // Cek apakah fungsi dipanggil dan parameter yang diterima
     console.log('createFeedback dipanggil');
@@ -55,7 +57,7 @@ export async function createFeedback(params: CreateFeedbackParams){
     try {
         // Format transcript menjadi string yang bisa dibaca AI
         const formattedTranscript = transcript
-            .map((sentence: { role: string; content: string }) =>(
+            .map((sentence: { role: string; content: string }) => (
                 `- ${sentence.role}: ${sentence.content}\n`
             )).join('');
 
@@ -63,10 +65,8 @@ export async function createFeedback(params: CreateFeedbackParams){
         console.log('formattedTranscript:', formattedTranscript);
 
         // Generate feedback menggunakan AI berdasarkan transcript
-        const { object: { totalScore, categoryScores, strengths, areasForImprovement, finalAssessment }} = await generateObject({
-            model: groq('meta-llama/llama-4-scout-17b-16e-instruct', {
-                structuredOutputs: false,
-            }),
+        const { object: { totalScore, categoryScores, strengths, areasForImprovement, finalAssessment } } = await generateObject({
+            model: groq('llama3-8b-8192'),
             schema: feedbackSchema,
             prompt: `
                 You are an AI interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories. Be thorough and detailed in your analysis. Don't be lenient with the candidate. If there are mistakes or areas for improvement, point them out.
@@ -90,8 +90,8 @@ export async function createFeedback(params: CreateFeedbackParams){
 
         // Simpan feedback ke Firestore
         const feedback = await db.collection('feedback').add({
-            interviewId,
-            userId,
+            feedbackInterviewId: interviewId,
+            feedbackUserId: userId,
             totalScore,
             categoryScores,
             strengths,
@@ -116,12 +116,12 @@ export async function createFeedback(params: CreateFeedbackParams){
 }
 
 export async function getFeedbackByInterviewId(params: GetFeedbackByInterviewIdParams): Promise<Feedback | null> {
-    const { interviewId, userId} = params;
+    const { interviewId, userId } = params;
 
     const feedback = await db
         .collection('feedback')
-        .where('interviewId', '==', interviewId)
-        .where('userId', '==', userId)
+        .where('feedbackInterviewId', '==', interviewId)
+        .where('feedbackUserId', '==', userId)
         .limit(1)
         .get();
 
@@ -130,6 +130,34 @@ export async function getFeedbackByInterviewId(params: GetFeedbackByInterviewIdP
 
     const feedbackDoc = feedback.docs[0];
     return {
-        id: feedbackDoc.id, ...feedbackDoc.data()
+        feedbackId: feedbackDoc.id, ...feedbackDoc.data()
     } as Feedback;
+}
+
+export async function getAllFeedbackByInterviewId(params: GetFeedbackByInterviewIdParams): Promise<Feedback[] | null> {
+    const { interviewId, userId } = params;
+
+    try {
+        const feedbackSnapshot = await db
+            .collection('feedback')
+            .where('feedbackInterviewId', '==', interviewId)
+            .where('feedbackUserId', '==', userId)
+            .orderBy('createdAt', 'asc')
+            .limitToLast(5)
+            .get();
+
+        if (feedbackSnapshot.empty) return null;
+
+        const feedbackList = feedbackSnapshot.docs.map((doc, index) => ({
+            feedbackId: doc.id,
+            ...doc.data(),
+            attemptNumber: index + 1,
+        })) as Feedback[];
+
+        return feedbackList;
+    } catch (error) {
+        console.error('Error fetching all feedback by interviewId:', error);
+        console.error('If you see a Firestore index error, follow the link in the error message above to create the required composite index.');
+        return null;
+    }
 }

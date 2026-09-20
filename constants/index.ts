@@ -117,7 +117,7 @@ export const interviewer: CreateAssistantDTO = {
     },
     model: {
         provider: "groq",
-        model: "llama-3.1-8b-instant",
+        model: "llama3-8b-8192",
         messages: [
             {
                 role: "system",
@@ -206,8 +206,8 @@ export const interviewCovers = [
 
 export const dummyInterviews: Interview[] = [
     {
-        id: "1",
-        userId: "user1",
+        interviewId: "1",
+        interviewUserId: "user1",
         role: "Frontend Developer",
         type: "Technical",
         techstack: ["React", "TypeScript", "Next.js", "Tailwind CSS"],
@@ -217,8 +217,8 @@ export const dummyInterviews: Interview[] = [
         createdAt: "2024-03-15T10:00:00Z",
     },
     {
-        id: "2",
-        userId: "user1",
+        interviewId: "2",
+        interviewUserId: "user1",
         role: "Full Stack Developer",
         type: "Mixed",
         techstack: ["Node.js", "Express", "MongoDB", "React"],

@@ -133,7 +133,7 @@ const Agent = ({
         }
     }, [callStatus, router]);
 
-    // 🚀 START CALL
+    //  START CALL
     const handleCall = async () => {
         try {
             setError(null);
@@ -147,7 +147,7 @@ const Agent = ({
                         username: userName,
                         userid: userId,
 
-                        // 🔥 Optional tapi bantu AI
+                        //  Optional tapi bantu AI
                         role: role || "",
                         type: type || "",
                         level: level || "",
@@ -179,7 +179,7 @@ const Agent = ({
         }
     };
 
-    // 🛑 STOP CALL
+    //  STOP CALL
     const handleDisconnect = () => {
         try {
             vapi.stop();
@@ -197,7 +197,7 @@ const Agent = ({
 
     return (
         <>
-            {/* 🔊 CALL VIEW */}
+            {/*  CALL VIEW */}
             <div className="call-view">
                 <div className="card-interviewer">
                     <div className="avatar">
@@ -227,7 +227,7 @@ const Agent = ({
                 </div>
             </div>
 
-            {/* 💬 TRANSCRIPT */}
+            {/*  TRANSCRIPT */}
             {messages.length > 0 && (
                 <div className="transcript-border">
                     <div className="transcript">
@@ -244,7 +244,7 @@ const Agent = ({
                 </div>
             )}
 
-            {/* ❌ ERROR */}
+            {/*  ERROR */}
             {error && (
                 <p className="text-red-500 text-center mt-4">
                     {error}

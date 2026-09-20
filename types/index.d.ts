@@ -1,6 +1,7 @@
 interface Feedback {
-    id: string;
-    interviewId: string;
+    feedbackId: string;
+    feedbackInterviewId: string;
+    feedbackUserId: string;
     totalScore: number;
     categoryScores: Array<{
         name: string;
@@ -11,18 +12,20 @@ interface Feedback {
     areasForImprovement: string[];
     finalAssessment: string;
     createdAt: string;
+    attemptNumber?: number;
 }
 
 interface Interview {
-    id: string;
+    interviewId: string;
     role: string;
     level: string;
     questions: string[];
     techstack: string[];
     createdAt: string;
-    userId: string;
+    interviewUserId: string;
     type: string;
     finalized: boolean;
+    coverImage?: string;
 }
 
 interface CreateFeedbackParams {
@@ -35,11 +38,11 @@ interface CreateFeedbackParams {
 interface User {
     name: string;
     email: string;
-    id: string;
+    userId: string;
 }
 
 interface InterviewCardProps {
-    id?: string;
+    interviewId?: string;
     userId?: string;
     role: string;
     type: string;

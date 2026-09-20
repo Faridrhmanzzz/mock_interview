@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
         // ✅ Generate pertanyaan
         const completion = await client.chat.completions.create({
-            model: "llama-3.1-8b-instant",
+            model: "llama3-8b-8192",
             messages: [
                 {
                     role: "system",
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
                 ? techstack.split(",").map((s: string) => s.trim())
                 : [],
             questions,
-            userId: userid,
+            interviewUserId: userid,
             finalized: true,
             coverImage: getRandomInterviewCover(),
             createdAt: new Date().toISOString()
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
 
         return Response.json({
             success: true,
-            id: docRef.id
+            interviewId: docRef.id
         });
 
     } catch (error: any) {

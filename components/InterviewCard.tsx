@@ -8,7 +8,7 @@ import DisplayTechIcons from "@/components/DisplayTechIcons";
 import {getFeedbackByInterviewId} from "@/lib/actions/general.action";
 
 export const InterviewCard = async ({
-                                  id,
+                                  interviewId,
                                   userId,
                                   role,
                                   type,
@@ -16,8 +16,8 @@ export const InterviewCard = async ({
                                   createdAt
                               }: InterviewCardProps) => {
 
-    const feedback = userId && id
-    ? await getFeedbackByInterviewId({interviewId: id, userId})
+    const feedback = userId && interviewId
+    ? await getFeedbackByInterviewId({interviewId, userId})
         : null;
 
     // ✅ Normalize type
@@ -84,8 +84,8 @@ export const InterviewCard = async ({
                         <Link
                             href={
                                 feedback
-                                    ? `/interview/${id}/feedback`
-                                    : `/interview/${id}`
+                                    ? `/interview/${interviewId}/feedback`
+                                    : `/interview/${interviewId}`
                             }
                         >
                             {feedback ? 'Check Feedback' : 'View Interview'}

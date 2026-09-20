@@ -110,7 +110,7 @@ export async function getCurrentUser(): Promise<User | null>{
         return {
             // FIX: Gunakan titik sebelum data(), bukan koma
             ...userRecord.data(),
-            id: userRecord.id,
+            userId: userRecord.id,
         } as User;
     } catch (e){
         console.log(e)
@@ -122,6 +122,11 @@ export async function isAuthenticated(){
     const user = await getCurrentUser();
 
     return !!user;
+}
+
+export async function signOut(){
+    const cookieStore = await cookies();
+    cookieStore.delete('session');
 }
 
 // export async function getInterviewsByUserId(userId: string): Promise<Interview[] | null> {

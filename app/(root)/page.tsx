@@ -9,13 +9,13 @@ import { getInterviewsByUserId, getFeedbackByInterviewId } from "@/lib/actions/g
 const Page = async () => {
     const user = await getCurrentUser();
 
-    const userInterviews = await getInterviewsByUserId(user?.id!);
+    const userInterviews = await getInterviewsByUserId(user?.userId!);
 
     const interviewsWithFeedback = await Promise.all(
         (userInterviews || []).map(async (interview) => {
             const feedback = await getFeedbackByInterviewId({
-                interviewId: interview.id,
-                userId: user?.id!
+                interviewId: interview.interviewId,
+                userId: user?.userId!
             });
             return { ...interview, hasFeedback: !!feedback };
         })
@@ -53,8 +53,8 @@ const Page = async () => {
                         completedInterviews.map((interview) => (
                             <InterviewCard
                                 {...interview}
-                                userId={user?.id}
-                                key={interview.id}
+                                userId={user?.userId}
+                                key={interview.interviewId}
                             />
                         ))
                     ) : (
@@ -72,8 +72,8 @@ const Page = async () => {
                         pendingInterviews.map((interview) => (
                             <InterviewCard
                                 {...interview}
-                                userId={user?.id}
-                                key={interview.id}
+                                userId={user?.userId}
+                                key={interview.interviewId}
                             />
                         ))
                     ) : (
